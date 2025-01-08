@@ -1,0 +1,61 @@
+test:
+  workers:
+    type: local
+    number: 1
+  rounds:
+    - label: Query all chits/ Read. 
+      txDuration: 50  #transaction duration 
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 15 #with  of 5 TPS
+            transactionLoad: 5  # new
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryAllChits.js
+        #module: benchmarks/scenario/simple/fabcar/changeCarOwner.js
+        arguments:
+          assets: 10
+          startKey: '1'
+          endKey: '50'
+    - label: Query a chit.
+      #txDuration: 10
+      txDuration: 50     #new
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 15  #new
+            transactionLoad: 5
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryChit.js
+        arguments:
+          assets: 10
+    - label: Create a chit/ Write.
+      txDuration: 50
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 15  #new
+            transactionLoad: 5
+      workload:
+        module: benchmarks/scenario/simple/chitfund/createChit.js
+monitors:
+  resource:
+  - module: docker
+    options:
+      interval: 5 # declares the monitoring of all local docker containers, with a 50 second update frequency. To solve error cpu_usage increse the interval value 10,20,30,....
+      containers: [all]
+      #- all
+    charting:   # 1 tab right all contains
+      bar:
+        metrics: [Memory(max), CPU%(avg)]
+        #metrics: [all]
+        #metrics: [CPU%(avg), Memory(max)]
+      polar:
+        metrics: [all]
+  - module: process
+    options:
+      interval: 3
+      processes: [{ command: 'node', arguments: 'caliper', multiOutput: 'avg' }]
+    charting: # 1 tab right all contains
+      bar:
+        metrics: [all]

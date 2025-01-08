@@ -1,0 +1,5 @@
+2022.11.23-16:56:59.242[90m debug[39m [caliper] [rateControl.js] 	Constructed a winston logger with the specified settings
+2022.11.23-16:56:59.331[32m info [39m [caliper] [bind] 	User-provided arguments for npm: "-g"
+2022.11.23-16:56:59.332[32m info [39m [caliper] [bind] 	Binding for fabric@2.2. This might take some time...
+2022.11.23-16:56:59.332[32m info [39m [caliper] [bind] 	Using working directory: /home/network/Hyperledger-Fabric/explorer
+2022.11.23-16:56:59.332[32m info [39m [caliper] [bind] 	Calling npm with: install -g fabric-network@2.2.3 fabric-ca-client@2.2.3

@@ -1,0 +1,113 @@
+test:
+  workers:
+    type: local
+    number: 1
+  rounds:
+    - label: Round 1/100000 KYC verfication at 50 TPS #Query all chits/ Read multiple transactions. 
+      #txDuration: 30 #transaction duration - the transaction run 30 seconds
+      txNumber: 100000  # total number of transaction in this round round
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 50 #with  of 5 TPS- per second number of transaction
+            #transactionLoad: 5  # new
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryChit.js   #createChit.js   #queryChit.js      #queryAllChits.js                      
+        #module: benchmarks/scenario/simple/fabcar/changeOwner.js
+        arguments:
+          assets: 10  # previously its 10 in all need in read operation queryAllChits.js not in write operation createChit.js
+          startKey: '1'
+          endKey: '50'
+    - label: Round 2/100000 KYC verfication at 100 TPS #Query a chit/ Read single transaction.
+      #txDuration: 10
+      #txDuration: 30     #new
+      txNumber: 100000
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 100  #new
+            #transactionLoad: 5
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryChit.js   #createChit.js    #queryChit.js    #createChit.js  #queryAllChits.js                        #queryChit.js
+        arguments:
+          assets: 10
+          startKey: '1'
+          endKey: '50'
+    - label: Round 3/100000 KYC verfication at 150 TPS #Create a chit/ Write.
+      #txDuration: 30
+      txNumber: 100000
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 150  #new
+            #transactionLoad: 5
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryChit.js   #createChit.js    #queryChit.js    #createChit.js    #queryAllChits.js                       #createChit.js
+        arguments:
+          assets: 10
+          startKey: '1'
+          endKey: '50'
+    - label: Round 4/100000 KYC verfication  at 200 TPS #Create a chit/ Write.
+      #txDuration: 30
+      txNumber: 100000
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 200  #new
+            #transactionLoad: 5
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryChit.js    #createChit.js     #queryChit.js    #createChit.js     #queryAllChits.js                       #createChit.js
+        arguments:
+          assets: 10
+          startKey: '1'
+          endKey: '50'
+    - label: Round 5/100000 KYC verfication  at 250 TPS #250 TPS #Create a chit/ Write.
+      #txDuration: 30
+      txNumber: 100000
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 250  #new
+            #transactionLoad: 5
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryChit.js   #createChit.js         #createChit.js  #queryAllChits.js  
+        arguments:
+          assets: 10
+          startKey: '1'
+          endKey: '50'  
+    - label: Round 6/100000 KYC verfication  at 300 TPS #250 TPS #Create a chit/ Write.
+      #txDuration: 30
+      txNumber: 100000
+      rateControl:
+          type: fixed-load
+          opts:
+            tps: 300  #new
+            #transactionLoad: 5
+      workload:
+        module: benchmarks/scenario/simple/chitfund/queryChit.js   #createChit.js         #createChit.js  #queryAllChits.js  
+        arguments:
+          assets: 10
+          startKey: '1'
+          endKey: '50'        
+monitors:
+  resource:
+  - module: docker
+    options:
+      interval: 5 #5 # declares the monitoring of all local docker containers, with a 50 second update frequency. To solve error cpu_usage increse the interval value 10,20,30,....
+      containers: #[all]
+      - all
+    charting:   # 1 tab right all contains
+      bar:
+        metrics: [Memory(max), CPU%(avg)]
+          #metrics: [all]
+        #metrics: [CPU%(avg), Memory(max)]
+      polar:
+        metrics: [all]
+  - module: process
+    options:
+      interval: 3
+      processes: [{ command: 'node', arguments: 'caliper', multiOutput: 'avg' }]
+    charting: # 1 tab right all contains
+      bar:
+        metrics: [all]
+          #metrics: [Memory(max), CPU%(avg)]
