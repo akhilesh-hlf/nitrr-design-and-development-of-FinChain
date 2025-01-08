@@ -1,0 +1,3 @@
+[submodule "Hyperledger-Fabric"]
+	path = Hyperledger-Fabric
+	url = https://github.com/akhilesh-hlf/nitrr-design-and-development-of-FinChain.git
