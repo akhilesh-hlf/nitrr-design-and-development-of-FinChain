@@ -15,12 +15,12 @@ import hashlib
 from queue import Queue, Empty
 
 from .interface import Listener, Talker
-# from .interface import Listener, Talker
+
 from .protocol import MessageType, MessageDirection, RequestVotesResults, \
     AppendEntriesResults, RequestVotesMessage, AppendEntriesMessage, \
     parse_json_message
 
-# Adjust these to test
+
 address_book_fname = 'address_book.json'
 total_nodes = 1
 local_ip = '127.0.0.1'
@@ -35,11 +35,11 @@ class RaftNode(threading.Thread):
 
         self.verbose = verbose
 
-        # Where incoming client requests go
+     
         self.client_queue = Queue()
         self.client_lock = threading.Lock()
 
-        # List of known nodes and their communication information
+       
         if (isinstance(config, dict)):
             address_book = config
         else:
@@ -47,34 +47,33 @@ class RaftNode(threading.Thread):
         self.all_ids = [address_book[a]['ip'] + ':' + address_book[a]['port'] for a in address_book if a != 'leader']
         self.my_id = address_book[name]['ip'] + ':' + address_book[name]['port']
 
-        # Timing variables
-        self.election_timeout = random.uniform(0.1, 0.1+0.05*len(self.all_ids)) # Failed vote backoff, used for pretty much all timing related things.
-        self.heartbeat_frequency = 0.01                                     # How often to send heartbeat (should be less than the election timeout).
-        self.resend_time = 2.0                                              # How often to resend an append entries if you havent heard from a node in a while. 
-
-        # State variables that I've added
-        self._name = name                                                   # Your name. Used mostly for debugging.
-        self.current_num_nodes = len(self.all_ids)                          # Number of nodes in the system.
-        self.current_role = role                                            # Your role in the system (follower, candidate, leader, pending).
-        self.leader_id = None                                               # Who you think the current leader is.
         
-        # Persistent state variables
-        self.current_term = 1                                               # Your current election term.
-        self.voted_for = None                                               # Who have you voted in this term. None means you haven't voted for anyone. 
-        self.log = [{'term': 1, 'entry': 'Init Entry', 'id': -1}]           # Your log. Log entries are a dict with the following fields: term, entry, id.
+        self.election_timeout = random.uniform(0.1, 0.1+0.05*len(self.all_ids)) 
+        self.heartbeat_frequency = 0.01                                     
+        self.resend_time = 2.0                                             
+
+      
+        self._name = name                                                
+        self.current_num_nodes = len(self.all_ids)                       
+        self.current_role = role                                           
+        self.leader_id = None                                             
+        
+       
+        self.current_term = 1                                             
+        self.voted_for = None                                             
+        self.log = [{'term': 1, 'entry': 'Init Entry', 'id': -1}]          
         self.log_hash = {}
     
-        # Volatile state variables
-        self.commit_index = 0                                               # Index of the highest known committed entry in the system.
-        self.last_applied_index = 0                                         # Index of the highest entry you have committed. Note that functionally this is the same as commit_index.
-        self.last_applied_term = 1                                          # Term of the highest entry you have committed.
+      
+        self.commit_index = 0                                              
+        self.last_applied_index = 0                                       
+        self.last_applied_term = 1                                         
 
-        # Volotile state leader variables 
-        self.next_index = [None for _ in range(self.current_num_nodes)]     # Index to send to each node next. None means up to date
-        self.match_index = [0 for _ in range(self.current_num_nodes)]       # Index of highest committed entry on each node
-        self.heard_from = [0 for _ in range(self.current_num_nodes)]        # Time last heard from each node. 
-
-        # Start both ends of your interface
+      
+        self.next_index = [None for _ in range(self.current_num_nodes)]    
+        self.match_index = [0 for _ in range(self.current_num_nodes)]      
+        self.heard_from = [0 for _ in range(self.current_num_nodes)]       
+       
         identity = {'my_id': self.my_id, 'my_name': name}
         self.listener = Listener(port_list=self.all_ids, identity=identity)
         self.listener.start()
@@ -157,10 +156,10 @@ class RaftNode(threading.Thread):
         '''
             run: Called when the node starts. Facilitates state transitions. 
         '''
-        # Wait for the interface to be ready
+
         time.sleep(self.listener.initial_backoff)
 
-        # Your role determines your action. Every time a state chance occurs, this loop will facilitate a transition to the next state. 
+      
         try:
             while not self._terminate:
                 if self.check_role() == 'leader':
@@ -192,50 +191,50 @@ class RaftNode(threading.Thread):
             incoming_message = self._get_message()
             if (incoming_message is not None):
 
-                # Followers only handle requests
+               
                 if (incoming_message.direction == MessageDirection.Request):
 
-                    # Incoming message is a new election candidate
+                 
                     if (incoming_message.type == MessageType.RequestVotes):
 
-                        # If this election is for a new term, update your term
+                      
                         if (incoming_message.term > self.current_term):
                             self._increment_term(incoming_message.term)
                             
-                        # If you haven't already voted and you're less up to date than the candidate, send your vote
+                      
                         if ((self.voted_for is None) and (incoming_message.last_log_index >= self.last_applied_index) and (incoming_message.last_log_term >= self.last_applied_term)):
                             self._send_vote(incoming_message.sender)
                         else: 
                             self._send_vote(incoming_message.sender, False)
 
-                        # If there's currently a candidate running, then you shouldn't promote yourself
+                       
                         most_recent_heartbeat = time.time()
 
-                    # Incoming message is a heartbeat, make sure you're up to date, restart the timer
+                   
                     elif (incoming_message.type == MessageType.Heartbeat):
                         if (incoming_message.term > self.current_term):
                             self._increment_term(incoming_message.term)
                         self.leader_id = incoming_message.leader_id
                         most_recent_heartbeat = time.time()
 
-                        # If leader has been resolved, check for any client requests
+                       
                         if (self.leader_id):
                             client_request = self._get_client_request()
                             if (client_request is not None):
                                 self._send_client_request(incoming_message.leader_id, client_request)
                         
-                    # Incoming message is some data to append
+                   
                     elif (incoming_message.type == MessageType.AppendEntries):
                         
-                        # Reply false if message term is less than current_term, this is an invalid entry
+                       
                         if (incoming_message.term < self.current_term):
                             self._send_acknowledge(incoming_message.leader_id, False)
 
-                        # Reply false if log doesnt contain an entry at prev_log_index whose term matches prev_log_term
+                        
                         elif (not self._verify_entry(incoming_message.prev_log_index, incoming_message.prev_log_term)):
                             self._send_acknowledge(incoming_message.leader_id, False)
 
-                        # Else if the previous index and term match, append the entry and reply true
+                       
                         else:
                             if (incoming_message.leader_commit > self.commit_index):
                                 self._append_entry(incoming_message.entries, commit=True, prev_index=incoming_message.prev_log_index)
@@ -243,11 +242,11 @@ class RaftNode(threading.Thread):
                                 self._append_entry(incoming_message.entries, commit=False, prev_index=incoming_message.prev_log_index)
                             self._send_acknowledge(incoming_message.leader_id, True)
                     
-                    # Incoming message is a commit message
+                    
                     elif (incoming_message.type == MessageType.Committal):
                         self._commit_entry(incoming_message.prev_log_index, incoming_message.prev_log_term)
 
-            # If you haven't heard a heartbeat in a while, promote yourself to a candidate
+            
             if ((time.time() - most_recent_heartbeat) > (self.election_timeout)):
                 self._set_current_role('candidate')
                 return
@@ -274,30 +273,30 @@ class RaftNode(threading.Thread):
         if(self.verbose):
             print(self._name + ': became candidate')
 
-        # If you're a candidate, then this is a new term
+      
         self._increment_term()
 
-        # Request for nodes to vote for you
+      
         self._send_request_vote()
 
-        # Vote for yorself
+      
         self._send_vote(self.my_id, True)
         
-        # Keep track of votes for and against you
+   
         votes_for_me = 0
         total_votes = 0
 
-        # Keep track of how long the election has been going
+      
         time_election_going = time.time()
 
         while ((not self._terminate) and (self.check_role() == 'candidate')):
             incoming_message = self._get_message()
             if (incoming_message is not None):
 
-                # Handle responses to your election
+                
                 if (incoming_message.direction == MessageDirection.Response):
                 
-                    # If it is a vote, then tally for or against you
+                   
                     if (incoming_message.type == MessageType.RequestVotes):
                         if (incoming_message.results.vote_granted):
                             votes_for_me += 1
@@ -306,15 +305,15 @@ class RaftNode(threading.Thread):
                         #print(self._name + ": votes for me " + str(votes_for_me))
                         #print(self._name + ": total votes " + str(total_votes))
                             
-                        # If you have a majority, promote yourself
+                        
                         if ((votes_for_me > int(old_div(self.current_num_nodes, 2))) or (self.current_num_nodes == 1)):
                             self._set_current_role('leader')
                             return
 
-                # Handle outside requests
+              
                 elif (incoming_message.direction == MessageDirection.Request):
 
-                    # If there's an election for someone else on a higher term, update your term, vote for them, and demote yourself
+                   
                     if (incoming_message.type == MessageType.RequestVotes):
                         if (incoming_message.term > self.current_term):
                             self._increment_term(incoming_message.term)
@@ -322,7 +321,7 @@ class RaftNode(threading.Thread):
                             self._set_current_role('follower')
                             return
 
-                    # If you see a heartbeat on the current term then someone else has been elected, update your term and demote yourself
+                    
                     elif (incoming_message.type == MessageType.Heartbeat):
                         if (incoming_message.term >= self.current_term):
                             self._increment_term(incoming_message.term)
@@ -330,7 +329,7 @@ class RaftNode(threading.Thread):
                             self._set_current_role('follower')
                             return
             
-            # If this election has been going for a while we're probably deadlocked, restart the election
+           
             if ((time.time() - time_election_going) > self.election_timeout):
                 if(self.verbose):
                     print(self._name + ': election timed out')
@@ -362,59 +361,58 @@ class RaftNode(threading.Thread):
         if(self.verbose):
             print(self._name + ': became leader')
 
-        # First things first, send a heartbeat
+        
         self._send_heartbeat()
 
-        # Keep track of when you've sent the last heartbeat
+     
         most_recent_heartbeat = time.time()
 
-        # You're the current leader
+    
         self.leader_id = self.my_id
 
-        # Assume all other nodes are up to date with your log
+     
         self.match_index = [self.commit_index for _ in range(self.current_num_nodes)]
         self.next_index = [None for _ in range(self.current_num_nodes)]
 
-        # Reset heard from
+    
         self.heard_from = [time.time() for _ in range(self.current_num_nodes)]
         last_log_hash = self._get_log_hash()
-        # Broadcast an entry to get everyone on the same page
+     
         entry = {'term': self.current_term, 'entry': 'Leader Entry', 'id': -1,'last_log_hash': self._get_log_hash()}
         self._broadcast_append_entries(entry)
 
         while ((not self._terminate) and (self.check_role() == 'leader')):
 
-            # First, send a heartbeat
+         
             if ((time.time() - most_recent_heartbeat) > self.heartbeat_frequency):
                 self._send_heartbeat()
                 most_recent_heartbeat = time.time()
                 if (self.verbose):
                     pass
-                    #print(self._name + ': sent heartbeat')
-                    #print(self._name + ': max committed index: ' + str(self.commit_index))
+                  
 
-            # If you haven't heard from a node in a while and it's not up to date, resend the most recent append entries
+          
             for node, index in enumerate(self.next_index):
                 if ((index is not None) and ((time.time() - self.heard_from[node]) > self.resend_time)):
                     self._send_append_entries(index - 1, self.log[index - 1]['term'], self.log[index], self.all_ids[node])
                     self.heard_from[node] = time.time()
 
-            # Watch for messages
+            
             incoming_message = self._get_message()
             if (incoming_message is not None):
 
-                # Handle incoming responses 
+                
                 if (incoming_message.direction == MessageDirection.Response):
 
-                    # Incoming message is an ack, update next_index and see if there's more log to send
+                   
                     if (incoming_message.type == MessageType.Acknowledge):
                         sender_index = self._get_node_index(incoming_message.sender)
                         self.heard_from[sender_index] = time.time()
 
-                        # If you haven't already gotten a positive ack for this operation 
+                       
                         if (self.next_index[sender_index] is not None):
 
-                            # If the append entries was successful, then increment next index to send, otherwise decrement
+                           
                             if (incoming_message.results.success):
                                 self.match_index[sender_index] = self.next_index[sender_index]
                                 self.next_index[sender_index] += 1
@@ -422,7 +420,7 @@ class RaftNode(threading.Thread):
                                 if (self.next_index[sender_index] != 1):
                                     self.next_index[sender_index] -= 1
 
-                            # Are there more entries to send to bring this node up to date?
+                           
                             if self.next_index[sender_index] > self._log_max_index():
                                 self.next_index[sender_index] = None
                             else:
@@ -432,7 +430,7 @@ class RaftNode(threading.Thread):
                             if (self.verbose):
                                 print(self._name + ": updated standing is " + str(self.match_index) + " my index: " + str(self._log_max_index()))
 
-                            # Determine the 'committable' indices
+                           
                             log_lengths = [int(i) for i in self.match_index if (i is not None)]
                             log_lengths.sort(reverse=True)
                             max_committable_index = 0
@@ -442,19 +440,19 @@ class RaftNode(threading.Thread):
                                 if (replicated_on >= (int(old_div(self.current_num_nodes, 2)) + 1)):
                                     max_committable_index = index
 
-                            # If there's a new committable index, then send the commit
+                           
                             if (max_committable_index > self.commit_index):
                                     self._broadcast_commmit_entries(max_committable_index)
 
-                    # If its a client then it's a new request
+                  
                     elif (incoming_message.type == MessageType.ClientRequest):
                         client_request = incoming_message.entries
                         self._broadcast_append_entries(client_request)
 
-                # Handle incoming requests
+             
                 elif (incoming_message.direction == MessageDirection.Request):
 
-                    # Incoming message is a request votes, if there's a vote going on with a term above yours, update your term, vote for them, and demote yourself
+                   
                     if (incoming_message.type == MessageType.RequestVotes):
                         if (incoming_message.term > self.current_term):
                             self._increment_term(incoming_message.term)
@@ -465,7 +463,7 @@ class RaftNode(threading.Thread):
                                 print(self._name + ': saw higher term, demoting')
                             return
             
-            # Get any pending client requests
+            
             client_request = self._get_client_request()
             if (client_request is not None):
                 self._broadcast_append_entries(client_request)
@@ -585,19 +583,19 @@ class RaftNode(threading.Thread):
         '''
 
     
-        # If prev_term was specified, might have to cut the log short
+       
         if (prev_index is None):
             prev_index = len(self.log) - 1
         else:
             self.log = self.log[:prev_index+1]
         
-        # Add this to the log
+       
         prev_term = self.log[-1]['term']
         with self.client_lock:
             self.log.append(entry)
             self.log_hash[entry['id']] = entry
 
-        # Maybe commit
+      
         if (commit):
             self._commit_entry(prev_index, entry['term'])
 
@@ -617,7 +615,7 @@ class RaftNode(threading.Thread):
         self.last_applied_index = index
         self.last_applied_term = term
 
-        # Commit index can be used in parallel by the client to query a log index
+      
         with self.client_lock:
             self.commit_index = index
 
@@ -630,19 +628,19 @@ class RaftNode(threading.Thread):
                 entry: (dict with the attributes 'term' and 'entry') 
                     Entry to append to all nodes.    
         '''
-        # Append the new entry 
+       
         prev_index, prev_term = self._append_entry(entry, commit=False)
 
-        # Send out other append entries
+       
         for node, index in enumerate(self.next_index):
-            # Only send out append entries to nodes that are up-to-date. Also they will now be out of date so update next. 
+           
             last_log_hash = self._get_log_hash() 
             if (index is None):
                 # self._send_append_entries(prev_index, prev_term, entry, self.all_ids[node])
                 self._send_append_entries(prev_index, prev_term, entry, self.all_ids[node], last_log_hash)
                 self.next_index[node] = self._log_max_index()
 
-        # Update your own information
+       
         self.next_index[self._get_node_index(self.my_id)] =  None
         self.match_index[self._get_node_index(self.my_id)] = self._log_max_index()
 
@@ -654,10 +652,10 @@ class RaftNode(threading.Thread):
                 index: (int) 
                     Index to commit.          
         '''
-        # Commit yourself
+       
         self._commit_entry(index, self.log[index]['term'])
 
-        # Commit everybody else
+        
         for node, index in enumerate(self.match_index):
             if (index >= index):
                 self._send_committal(index, self.all_ids[node])
@@ -708,7 +706,7 @@ class RaftNode(threading.Thread):
         )
         self._send_message(message)
     def _get_log_hash(self):
-    # Assuming you store your log as a list of entries, calculate the hash of the log's last entry
+  
         if not self.log:
             return ""
     
@@ -716,22 +714,7 @@ class RaftNode(threading.Thread):
         entry_string = str(last_entry)  # Convert entry to string (or another format)
         return hashlib.sha256(entry_string.encode()).hexdigest()  # Hashing with SHA256
 
-    # def _send_append_entries(self, index, term, entries, receiver=None, last_log_hash=None):
-    #     last_log_hash = self._get_log_hash()
-    #     message = AppendEntriesMessage(
-    #         type_ = MessageType.AppendEntries,
-    #         term = self.current_term,
-    #         sender = self.my_id,
-    #         receiver = receiver,
-    #         direction = MessageDirection.Request,
-    #         leader_id = self.my_id,
-    #         prev_log_index = index,
-    #         prev_log_term = term,
-    #         entries = entries,
-    #         leader_commit = self.commit_index,
-    #         last_log_hash = last_log_hash 
-    #     )
-    #     self._send_message(message)
+
     def _send_append_entries(self, index, term, entries, receiver=None, last_log_hash=None):
         last_log_hash = self._get_log_hash()  # Get the log hash
         message = AppendEntriesMessage(
@@ -823,7 +806,7 @@ def test_failures():
     with open(address_book_fname, 'w') as outfile:
         json.dump(d, outfile)
 
-    # Create and start the sentinals
+   
     s = []
     node_num = 1
     for p in range(start_port, start_port+total_nodes):
@@ -834,12 +817,12 @@ def test_failures():
         n.start()
     time.sleep(2)
 
-    # Make some requests
+  
     for i in range(10):
         s[0].client_request(i)
     time.sleep(3)
 
-    # Pause about half of them, including the leader
+ 
     l = [n for n in s if (n.check_role() == 'leader')][0]
     l.pause()
     num_to_kill = int(old_div(total_nodes, 2)) - 1
@@ -851,12 +834,12 @@ def test_failures():
             n.pause()
     time.sleep(5)
 
-    # Unpause them
+
     for n in s:
         n.un_pause()
     time.sleep(5)
 
-    # Need to do this before closing
+    
     for n in s:
         n.stop() 
 
