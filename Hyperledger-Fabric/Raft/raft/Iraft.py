@@ -123,17 +123,8 @@ class RaftNode(threading.Thread):
         with self.client_lock:
             return self.log_hash.get(id_num, None)
     import random
-import time
-import hashlib
-import threading
 
-# Raft Node States
-FOLLOWER = "follower"
-CANDIDATE = "candidate"
-LEADER = "leader"
 
-# Raft Node class
-class RaftNode:
     def __init__(self, id, total_nodes):
         self.id = id
         self.state = FOLLOWER
